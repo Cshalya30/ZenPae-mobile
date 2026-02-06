@@ -7,6 +7,12 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "extra": {
+      "OPENAI_API_KEY": "sk-REPLACE_WITH_YOUR_REAL_KEY",
+      "eas": {
+        "projectId": "0c19cadd-b9b7-47e4-854a-6a68975e2755"
+      }
+    },
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -16,6 +22,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.zenpae.mobile",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
