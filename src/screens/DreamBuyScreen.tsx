@@ -1,466 +1,512 @@
-import React, { useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import {
   View,
-  Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
+  Modal,
+  FlatList,
   Animated,
+  useWindowDimensions,
+  Pressable,
 } from 'react-native';
+import Text from '../components/Text';
+import { BlurView } from 'expo-blur';
+import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, spacing, typography, card, progress, button } from '../theme/theme';
+import Svg, { Circle, Line } from 'react-native-svg';
 import Screen from '../components/Screen';
-import { useFinanceStore } from '../store/financeStore';
-import { formatCurrency } from '../utils/format';
+import { useFinanceStore, type DreamGoal } from '../store/financeStore';
+import { formatCurrency, parseAmount } from '../utils/format';
+import { useTheme } from '../theme/useTheme';
+
+const EMOJIS = [
+  '✨', '🚀', '💻', '🏝️', '🏖️', '🎧', '🎯', '🧳', '🏍️', '📸', '🪙', '🧠',
+  '🏡', '🎓', '🛫', '🚗', '⌚', '🎁', '🏋️', '🍀', '🌙', '🪄', '🎮', '🧿',
+];
 
 export const DreamBuyScreen: React.FC = () => {
-  const pulseAnim = new Animated.Value(1);
-  const user = useFinanceStore((state) => state.user);
-  const dreams = useFinanceStore((state) => state.dreams);
-  const activeDreamId = useFinanceStore((state) => state.activeDreamId);
-  const addDream = useFinanceStore((state) => state.addDream);
-  const setActiveDream = useFinanceStore((state) => state.setActiveDream);
-  const savings = useFinanceStore((state) => state.savings);
+  const theme = useTheme();
+  const { width } = useWindowDimensions();
+  const { dreams, activeDreamId, saveDream, setActiveDream, savings } = useFinanceStore();
 
-  const templates = [
-    { id: 'travel', label: 'Travel', icon: 'T', target: 25000 },
-    { id: 'tech', label: 'Tech', icon: 'C', target: 18000 },
-    { id: 'gadgets', label: 'Gadgets', icon: 'G', target: 12000 },
-    { id: 'fitness', label: 'Fitness', icon: 'F', target: 15000 },
-  ];
+  const activeDream = useMemo(
+    () => dreams.find((d) => d.id === activeDreamId) ?? dreams[0],
+    [dreams, activeDreamId]
+  );
 
-  const createDreamFromTemplate = (templateId?: string) => {
-    const selected = templates.find((t) => t.id === templateId) ?? templates[0];
-    const now = Date.now();
-    const newDream = {
-      id: `${selected.id}-${now}`,
-      name: `${selected.label} Dream`,
-      description: `A focused ${selected.label.toLowerCase()} goal tailored for you.`,
-      targetAmount: selected.target,
-      saved: 0,
-      milestones: [
-        { label: 'Kickoff', hit: false },
-        { label: 'Halfway', hit: false },
-        { label: 'Finish', hit: false },
-      ],
-      templateId: selected.id,
-    };
+  const [emoji, setEmoji] = useState(activeDream?.emoji ?? '✨');
+  const [name, setName] = useState(activeDream?.name ?? '');
+  const [description, setDescription] = useState(activeDream?.description ?? '');
+  const [targetAmount, setTargetAmount] = useState(
+    activeDream?.targetAmount ? String(activeDream.targetAmount) : ''
+  );
+  const [allocation, setAllocation] = useState(activeDream?.allocationPct ?? 7);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
 
-    addDream(newDream);
-  };
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  const savedValue = activeDream?.saved ?? 0;
+  const goalValue = parseAmount(targetAmount || '0');
+  const progress = goalValue > 0 ? Math.min(savedValue / goalValue, 1) : 0;
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.05,
-          duration: 1500,
-          useNativeDriver: false,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: false,
-        }),
-      ])
-    ).start();
-  }, []);
+    Animated.timing(progressAnim, {
+      toValue: progress,
+      duration: 500,
+      useNativeDriver: false,
+    }).start();
+  }, [progress, progressAnim]);
+
+  useEffect(() => {
+    if (!activeDream) return;
+    setEmoji(activeDream.emoji ?? '✨');
+    setName(activeDream.name ?? '');
+    setDescription(activeDream.description ?? '');
+    setTargetAmount(activeDream.targetAmount ? String(activeDream.targetAmount) : '');
+    setAllocation(activeDream.allocationPct ?? 7);
+  }, [activeDream?.id]);
+
+  const handleSave = () => {
+    const id = activeDream?.id ?? Date.now().toString();
+    const goal: DreamGoal = {
+      id,
+      name: name.trim() || 'My Dream',
+      description: description.trim(),
+      targetAmount: goalValue || 10000,
+      saved: activeDream?.saved ?? 0,
+      milestones: [
+        { label: '25% reached', hit: false },
+        { label: '60% reached', hit: false },
+        { label: 'Goal achieved', hit: false },
+      ],
+      emoji,
+      allocationPct: allocation,
+    };
+    saveDream(goal);
+    setActiveDream(id);
+  };
 
   return (
     <Screen>
-      <Text style={styles.screenTitle}>Your Dreams</Text>
+      <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Dream Buy</Text>
+      <Text style={[styles.subTitle, { color: theme.colors.textSecondary }]}>
+        Turn everyday savings into something meaningful
+      </Text>
 
-      <View style={styles.heroCard}>
-        <Text style={styles.heroTitle}>Hey {user?.name ?? 'there'} *</Text>
-        <Text style={styles.heroSubtitle}>
-          Build a dream board. Track goals. Let Zenpae nudge your progress.
-        </Text>
-        <View style={styles.heroMetaRow}>
-          <Text style={styles.heroMeta}>
-            Linked to savings: {formatCurrency(savings)}
-          </Text>
-        </View>
+      <View style={styles.tabRow}>
+        {[
+          {
+            label: 'Emerald',
+            colors: ['#0F3D2E', '#99FF32'],
+            pattern: 'grid' as const,
+          },
+          {
+            label: 'Blue',
+            colors: ['#0B1C2D', '#1FA2A6'],
+            pattern: 'lines' as const,
+          },
+          {
+            label: 'Amber',
+            colors: ['#FF8A00', '#FF4D4D', '#6EE7B7'],
+            pattern: 'contour' as const,
+          },
+        ].map((tab, index) => {
+          const active = activeTab === index;
+          return (
+            <Pressable key={tab.label} style={styles.tabWrap} onPress={() => setActiveTab(index)}>
+              <LinearGradient
+                colors={tab.colors as unknown as [string, string, ...string[]]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.tab, { opacity: active ? 1 : 0.75 }]}
+              >
+                {tab.pattern === 'grid' ? (
+                  <Svg style={styles.tabOverlay} width="100%" height="100%">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <Line
+                        key={`g-${i}`}
+                        x1={-20 + i * 24}
+                        y1={0}
+                        x2={40 + i * 24}
+                        y2={80}
+                        stroke="rgba(255,255,255,0.07)"
+                        strokeWidth={1}
+                      />
+                    ))}
+                  </Svg>
+                ) : null}
+                {tab.pattern === 'lines' ? (
+                  <Svg style={styles.tabOverlay} width="100%" height="100%">
+                    {Array.from({ length: 7 }).map((_, i) => (
+                      <Line
+                        key={`l-${i}`}
+                        x1={-10}
+                        y1={i * 16}
+                        x2={140}
+                        y2={i * 16 + 24}
+                        stroke="rgba(255,255,255,0.06)"
+                        strokeWidth={1}
+                      />
+                    ))}
+                  </Svg>
+                ) : null}
+                {tab.pattern === 'contour' ? (
+                  <Svg style={styles.tabOverlay} width="100%" height="100%">
+                    <Circle cx="30%" cy="35%" r="20%" stroke="rgba(255,255,255,0.05)" strokeWidth={1} fill="none" />
+                    <Circle cx="30%" cy="35%" r="32%" stroke="rgba(255,255,255,0.05)" strokeWidth={1} fill="none" />
+                    <Circle cx="30%" cy="35%" r="44%" stroke="rgba(255,255,255,0.05)" strokeWidth={1} fill="none" />
+                  </Svg>
+                ) : null}
+                <Text style={styles.tabLabel}>{tab.label}</Text>
+              </LinearGradient>
+            </Pressable>
+          );
+        })}
       </View>
 
-      <View style={styles.templateSection}>
-        <Text style={styles.templateTitle}>Dream Templates</Text>
-        <View style={styles.templateRow}>
-          {templates.map((t) => (
+      <View style={[styles.cardWrap, { width: width - theme.spacing.lg * 2 }]}>
+        <BlurView intensity={22} tint={theme.mode === 'dark' ? 'dark' : 'light'} style={[styles.mainCard, { borderColor: theme.colors.border }]}>
+          <View style={styles.nameRow}>
             <TouchableOpacity
-              key={t.id}
-              style={styles.templateCard}
-              activeOpacity={0.85}
-              onPress={() => createDreamFromTemplate(t.id)}
+              style={[styles.emojiButton, { backgroundColor: theme.colors.accentSoft }]}
+              onPress={() => setShowEmojiPicker(true)}
             >
-              <View style={styles.templateIconWrap}>
-                <Text style={styles.templateIcon}>{t.icon}</Text>
-              </View>
-              <Text style={styles.templateLabel}>{t.label}</Text>
+              <Text style={styles.emojiText}>{emoji}</Text>
             </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Name your dream..."
+              placeholderTextColor={theme.colors.muted}
+              style={[styles.nameInput, { color: theme.colors.textPrimary }]}
+            />
+          </View>
 
-      <View style={styles.timelineCard}>
-        <Text style={styles.timelineTitle}>Momentum Timeline</Text>
-        <View style={styles.timelineRow}>
-          <View style={styles.timelineStep}>
-            <View style={styles.timelineIcon}>
-              <Text style={styles.timelineIconText}>1</Text>
-            </View>
-            <Text style={styles.timelineLabel}>Set Goal</Text>
-          </View>
-          <View style={styles.timelineStep}>
-            <View style={styles.timelineIcon}>
-              <Text style={styles.timelineIconText}>2</Text>
-            </View>
-            <Text style={styles.timelineLabel}>Auto-Save</Text>
-          </View>
-          <View style={styles.timelineStep}>
-            <View style={styles.timelineIcon}>
-              <Text style={styles.timelineIconText}>3</Text>
-            </View>
-            <Text style={styles.timelineLabel}>Redeem</Text>
-          </View>
-        </View>
-        <Text style={styles.timelineSub}>
-          Small wins stack up fast when you keep your streak alive.
-        </Text>
-      </View>
+          <TextInput
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Why is this important to you?"
+            placeholderTextColor={theme.colors.muted}
+            style={[styles.descriptionInput, { color: theme.colors.textSecondary }]}
+            multiline
+          />
 
-      {dreams.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>No dreams yet</Text>
-          <Text style={styles.emptyText}>
-            Add your first goal and turn round-ups into something memorable.
-          </Text>
-          <TouchableOpacity
-            style={styles.emptyPill}
-            activeOpacity={0.9}
-            onPress={() => createDreamFromTemplate()}
-          >
-            <LinearGradient
-              colors={button.gradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.emptyPillGradient}
-            >
-              <Text style={styles.emptyPillText}>Create a Dream</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        dreams.map((dream) => (
-          <TouchableOpacity
-            key={dream.id}
-            style={[
-              styles.dreamCard,
-              dream.id === activeDreamId && styles.dreamCardActive,
-            ]}
-            activeOpacity={0.9}
-            onPress={() => setActiveDream(dream.id)}
-          >
-            <View style={styles.dreamHeader}>
-              <Text style={styles.dreamTitle}>{dream.name}</Text>
-              <Text style={styles.dreamAmount}>
-                {formatCurrency(dream.targetAmount)}
+          <View style={styles.amountRow}>
+            <Text style={[styles.amountLabel, { color: theme.colors.textSecondary }]}>Target amount</Text>
+            <View style={[styles.amountInputWrap, { borderColor: theme.colors.border }]}>
+              <Text style={[styles.amountPrefix, { color: theme.colors.textSecondary }]}>₹</Text>
+              <TextInput
+                value={targetAmount}
+                onChangeText={setTargetAmount}
+                placeholder="0"
+                keyboardType="numeric"
+                placeholderTextColor={theme.colors.muted}
+                style={[styles.amountInput, { color: theme.colors.textPrimary }]}
+              />
+            </View>
+          </View>
+
+          <View style={styles.progressSection}>
+            <View style={styles.progressRow}>
+              <Text style={[styles.progressText, { color: theme.colors.textSecondary }]}>
+                Saved {formatCurrency(savedValue)} of {formatCurrency(goalValue || 0)}
+              </Text>
+              <Text style={[styles.progressPct, { color: theme.colors.accent }]}>
+                {Math.round(progress * 100)}%
               </Text>
             </View>
-
-            <Text style={styles.dreamDescription}>{dream.description}</Text>
-            <Text style={styles.dreamProgressText}>
-              Saved {formatCurrency(dream.saved)} ?{' '}
-              {Math.round(
-                (dream.saved / Math.max(dream.targetAmount, 1)) * 100
-              )}%
+            <View style={[styles.progressTrack, { backgroundColor: 'rgba(153,255,50,0.12)' }]}>
+              <Animated.View
+                style={[
+                  styles.progressFill,
+                  {
+                    backgroundColor: 'rgba(153,255,50,0.6)',
+                    width: progressAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0%', '100%'],
+                    }),
+                  },
+                ]}
+              />
+            </View>
+            <Text style={[styles.progressHint, { color: theme.colors.textSecondary }]}>
+              You're {Math.round(progress * 100)}% closer to your dream
             </Text>
+          </View>
 
-            <View style={styles.progressContainer}>
-              <View style={styles.progressTrack}>
-                <Animated.View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${(dream.saved / dream.targetAmount) * 100}%`,
-                    },
-                  ]}
-                />
-              </View>
+          <View style={styles.sliderSection}>
+            <Text style={[styles.sliderLabel, { color: theme.colors.textSecondary }]}>
+              Redirect savings to this dream
+            </Text>
+            <View style={styles.sliderRow}>
+              <Slider
+                style={styles.slider}
+                minimumValue={1}
+                maximumValue={15}
+                step={1}
+                value={allocation}
+                minimumTrackTintColor={theme.colors.accent}
+                maximumTrackTintColor={theme.progress.track}
+                thumbTintColor={theme.colors.accent}
+                onValueChange={setAllocation}
+              />
+              <Text style={[styles.sliderValue, { color: theme.colors.textPrimary }]}>{allocation}%</Text>
             </View>
+            <Text style={[styles.sliderHint, { color: theme.colors.textSecondary }]}>
+              {allocation}% of every saving will go toward this goal
+            </Text>
+          </View>
 
-            <View style={styles.milestonesContainer}>
-              {dream.milestones?.map((milestone: any, idx: number) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.milestone,
-                    milestone.hit && styles.milestoneHit,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.milestoneIndicator,
-                      milestone.hit && styles.milestoneIndicatorHit,
-                    ]}
-                  />
-                  <Text style={styles.milestoneText}>{milestone.label}</Text>
-                </View>
-              ))}
-            </View>
+          <TouchableOpacity
+            style={[styles.cta, { backgroundColor: theme.colors.accent }]}
+            onPress={handleSave}
+            activeOpacity={0.9}
+          >
+            <Text style={[styles.ctaText, { color: theme.colors.black }]}>Save Dream</Text>
           </TouchableOpacity>
-        ))
-      )}
+        </BlurView>
+      </View>
+
+      <View style={styles.linkedRow}>
+        <Text style={[styles.linkedText, { color: theme.colors.textSecondary }]}>
+          Linked to savings: {formatCurrency(savings)}
+        </Text>
+      </View>
+
+      <Modal visible={showEmojiPicker} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { backgroundColor: theme.colors.surfaceStrong }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.textPrimary }]}>Pick an emoji</Text>
+            <FlatList
+              data={EMOJIS}
+              numColumns={6}
+              keyExtractor={(item) => item}
+              contentContainerStyle={styles.emojiGrid}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={[styles.emojiCell, { backgroundColor: theme.colors.surfaceSecondary }]}
+                  onPress={() => {
+                    setEmoji(item);
+                    setShowEmojiPicker(false);
+                  }}
+                >
+                  <Text style={styles.emojiCellText}>{item}</Text>
+                </Pressable>
+              )}
+            />
+            <TouchableOpacity style={[styles.modalClose, { backgroundColor: theme.colors.accent }]} onPress={() => setShowEmojiPicker(false)}>
+              <Text style={[styles.modalCloseText, { color: theme.colors.black }]}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  screenTitle: {
-    ...typography.screenTitle,
-    marginBottom: spacing.lg,
-  } as any,
-  heroCard: {
-    backgroundColor: card.backgroundColor,
-    borderRadius: card.borderRadius,
-    padding: spacing.md,
-    borderWidth: card.borderWidth,
-    borderColor: card.borderColor,
-    shadowColor: card.shadowColor,
-    shadowOpacity: card.shadowOpacity,
-    shadowRadius: card.shadowRadius,
-    shadowOffset: card.shadowOffset,
-    elevation: card.elevation,
-    boxShadow: card.boxShadow,
-    marginBottom: spacing.lg,
-  } as any,
-  heroTitle: {
-    ...typography.sectionTitle,
-  } as any,
-  heroSubtitle: {
-    ...typography.bodySecondary,
-    marginTop: spacing.sm,
-  } as any,
-  heroMetaRow: {
-    marginTop: spacing.sm,
-  } as any,
-  heroMeta: {
-    ...typography.small,
-    color: colors.accent,
-  } as any,
-  templateSection: {
-    marginBottom: spacing.lg,
-  } as any,
-  templateTitle: {
-    ...typography.label,
-    marginBottom: spacing.sm,
-  } as any,
-  templateRow: {
+  title: {
+    fontSize: 26,
+    fontWeight: '600',
+  },
+  subTitle: {
+    marginTop: 4,
+    fontSize: 13,
+    marginBottom: 16,
+  },
+  tabRow: {
     flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  tabWrap: {
+    flex: 1,
+  },
+  tab: {
+    height: 64,
+    borderRadius: 18,
+    justifyContent: 'flex-end',
+    padding: 10,
+    overflow: 'hidden',
+  },
+  tabOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    left: 0,
+    bottom: 0,
+  },
+  tabLabel: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cardWrap: {
+    alignSelf: 'center',
+  },
+  mainCard: {
+    borderRadius: 24,
+    padding: 18,
+    borderWidth: 0.5,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
-  } as any,
-  templateCard: {
-    flex: 1,
-    backgroundColor: card.backgroundColor,
-    borderRadius: 16,
-    borderWidth: card.borderWidth,
-    borderColor: card.borderColor,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    shadowColor: card.shadowColor,
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-    boxShadow: card.boxShadow,
-  } as any,
-  templateIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceSecondary,
+  },
+  emojiButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xs,
-  } as any,
-  templateIcon: {
+  },
+  emojiText: {
+    fontSize: 22,
+  },
+  nameInput: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  descriptionInput: {
+    marginTop: 12,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  amountRow: {
+    marginTop: 14,
+  },
+  amountLabel: {
+    fontSize: 12,
+  },
+  amountInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    borderWidth: 0.5,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  amountPrefix: {
     fontSize: 18,
-  } as any,
-  templateLabel: {
-    ...typography.bodySecondary,
-  } as any,
-  timelineCard: {
-    backgroundColor: card.backgroundColor,
-    borderRadius: card.borderRadius,
-    padding: spacing.md,
-    borderWidth: card.borderWidth,
-    borderColor: card.borderColor,
-    shadowColor: card.shadowColor,
-    shadowOpacity: card.shadowOpacity,
-    shadowRadius: card.shadowRadius,
-    shadowOffset: card.shadowOffset,
-    elevation: card.elevation,
-    boxShadow: card.boxShadow,
-    marginBottom: spacing.lg,
-  } as any,
-  timelineTitle: {
-    ...typography.sectionTitle,
-  } as any,
-  timelineRow: {
+    marginRight: 4,
+  },
+  amountInput: {
+    fontSize: 22,
+    fontWeight: '600',
+    flex: 1,
+  },
+  progressSection: {
+    marginTop: 16,
+  },
+  progressRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: spacing.md,
-  } as any,
-  timelineStep: {
-    alignItems: 'center',
-    flex: 1,
-  } as any,
-  timelineIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  } as any,
-  timelineIconText: {
-    ...typography.small,
-    color: colors.accent,
-    fontWeight: '700',
-  } as any,
-  timelineLabel: {
-    ...typography.small,
-  } as any,
-  timelineSub: {
-    ...typography.bodySecondary,
-    marginTop: spacing.md,
-  } as any,
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
-    backgroundColor: card.backgroundColor,
-    borderRadius: card.borderRadius,
-    borderWidth: card.borderWidth,
-    borderColor: card.borderColor,
-    shadowColor: card.shadowColor,
-    shadowOpacity: card.shadowOpacity,
-    shadowRadius: card.shadowRadius,
-    shadowOffset: card.shadowOffset,
-    elevation: card.elevation,
-    boxShadow: card.boxShadow,
-  } as any,
-  emptyTitle: {
-    ...typography.sectionTitle,
-  } as any,
-  emptyText: {
-    ...typography.bodySecondary,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-  } as any,
-  emptyPill: {
-    marginTop: spacing.md,
-    borderRadius: button.borderRadius,
-    overflow: 'hidden',
-  } as any,
-  emptyPillGradient: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: button.borderRadius,
-    alignItems: 'center',
-    justifyContent: 'center',
-  } as any,
-  emptyPillText: {
-    ...typography.button,
-    color: colors.black,
-  } as any,
-  dreamCard: {
-    backgroundColor: card.backgroundColor,
-    borderRadius: card.borderRadius,
-    padding: card.padding,
-    marginBottom: spacing.lg,
-    borderWidth: card.borderWidth,
-    borderColor: card.borderColor,
-    shadowColor: card.shadowColor,
-    shadowOpacity: card.shadowOpacity,
-    shadowRadius: card.shadowRadius,
-    shadowOffset: card.shadowOffset,
-    elevation: card.elevation,
-    boxShadow: card.boxShadow,
-  } as any,
-  dreamCardActive: {
-    borderColor: 'rgba(153,255,50,0.4)',
-  } as any,
-  dreamHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: 8,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  } as any,
-  dreamTitle: {
-    ...typography.sectionTitle,
-    flex: 1,
-  } as any,
-  dreamAmount: {
-    ...typography.balance,
-  } as any,
-  dreamDescription: {
-    ...typography.bodySecondary,
-    marginBottom: spacing.sm,
-  } as any,
-  dreamProgressText: {
-    ...typography.small,
-    color: colors.textSecondary,
-  } as any,
-  progressContainer: {
-    marginVertical: spacing.md,
-  } as any,
+  },
+  progressText: {
+    fontSize: 12,
+  },
+  progressPct: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   progressTrack: {
-    height: progress.height,
-    backgroundColor: progress.track,
-    borderRadius: progress.radius,
+    height: 12,
+    borderRadius: 6,
     overflow: 'hidden',
-  } as any,
+    marginTop: 8,
+  },
   progressFill: {
-    height: progress.height,
-    backgroundColor: colors.accent,
-    borderRadius: progress.radius,
-  } as any,
-  milestonesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: spacing.md,
-  } as any,
-  milestone: {
-    backgroundColor: colors.surfaceSecondary,
-    marginRight: spacing.sm,
-    marginBottom: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 20,
+    height: '100%',
+    borderRadius: 6,
+  },
+  progressHint: {
+    marginTop: 6,
+    fontSize: 12,
+  },
+  sliderSection: {
+    marginTop: 16,
+  },
+  sliderLabel: {
+    fontSize: 12,
+  },
+  sliderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  } as any,
-  milestoneHit: {
-    backgroundColor: colors.accent,
-  } as any,
-  milestoneIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.textPrimary,
-    marginRight: spacing.sm,
-  } as any,
-  milestoneIndicatorHit: {
-    backgroundColor: colors.black,
-  } as any,
-  milestoneText: {
-    ...typography.small,
-    color: colors.textPrimary,
-  } as any,
+    marginTop: 6,
+  },
+  slider: {
+    flex: 1,
+    height: 40,
+  },
+  sliderValue: {
+    width: 40,
+    textAlign: 'right',
+    fontWeight: '600',
+  },
+  sliderHint: {
+    fontSize: 12,
+  },
+  cta: {
+    marginTop: 18,
+    borderRadius: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  ctaText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  linkedRow: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  linkedText: {
+    fontSize: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    padding: 18,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  emojiGrid: {
+    paddingBottom: 8,
+  },
+  emojiCell: {
+    width: '16.6%',
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    marginBottom: 6,
+  },
+  emojiCellText: {
+    fontSize: 20,
+  },
+  modalClose: {
+    marginTop: 8,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalCloseText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
 
 export default DreamBuyScreen;

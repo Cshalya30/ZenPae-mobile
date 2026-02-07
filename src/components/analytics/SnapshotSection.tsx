@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import Text from '../Text';
 import { spacing, colors, typography } from '../../theme/theme';
 import { Transaction } from '../../store/financeStore';
 import { formatCurrency } from '../../utils/format';

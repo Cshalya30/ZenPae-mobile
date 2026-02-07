@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import Text from '../Text';
 import { spacing, colors, typography, card } from '../../theme/theme';
 import { Transaction } from '../../store/financeStore';
 
@@ -35,7 +36,6 @@ const styles = StyleSheet.create({
     shadowRadius: card.shadowRadius,
     shadowOffset: card.shadowOffset,
     elevation: card.elevation,
-    boxShadow: card.boxShadow,
   },
   insight: {
     ...typography.body,

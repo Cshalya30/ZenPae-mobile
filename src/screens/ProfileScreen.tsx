@@ -1,294 +1,426 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from 'react-native';
-import { colors, spacing, typography, card } from '../theme/theme';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, TouchableOpacity, Image, Modal, Pressable, Animated } from 'react-native';
+import Text from '../components/Text';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import Screen from '../components/Screen';
 import { useFinanceStore } from '../store/financeStore';
 import { formatCurrency } from '../utils/format';
+import { useTheme } from '../theme/useTheme';
+
+const PROFILE_IMAGE = require('../../assets/icon.png');
 
 export const ProfileScreen: React.FC = () => {
-  const user = useFinanceStore((state) => state.user);
-  const resetDemo = useFinanceStore((state) => state.resetDemo);
+  const theme = useTheme();
+  const { user, wallet, analytics, setThemeMode } = useFinanceStore();
+  const [showCustomInfo, setShowCustomInfo] = useState(false);
+  const fade = useRef(new Animated.Value(0)).current;
 
-  if (!user) {
-    return (
-      <Screen>
-        <Text style={styles.loadingText}>Loading profile...</Text>
-      </Screen>
-    );
-  }
+  useEffect(() => {
+    Animated.timing(fade, {
+      toValue: 1,
+      duration: 240,
+      useNativeDriver: true,
+    }).start();
+  }, [fade]);
+
+  const profileCards = [
+    { title: 'Spending Personality', subtitle: 'Understand how you spend and save' },
+    { title: 'Financial Health Score', subtitle: 'A simple score based on habits' },
+    { title: 'Risk Profile', subtitle: 'How conservative or aggressive you are' },
+    { title: 'Goal Preferences', subtitle: 'How you prioritise savings goals' },
+    { title: 'Device & Fraud Protection', subtitle: 'Extra safeguards for your account' },
+  ];
+
+  const settings = ['Privacy & security', 'Payment methods', 'Notifications', 'App preferences'];
 
   return (
     <Screen>
-      <Text style={styles.screenTitle}>Profile</Text>
+      <Animated.View style={{ opacity: fade }}>
+        <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Profile</Text>
 
-      <View style={styles.profileHero}>
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarRing}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.initials}>{user.initials || 'C'}</Text>
+        <BlurView intensity={20} tint={theme.mode === 'dark' ? 'dark' : 'light'} style={[styles.faceCard, { borderColor: theme.colors.border }]}>
+          <LinearGradient
+            colors={['rgba(153,255,50,0.1)', 'rgba(153,255,50,0.0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.faceGradient}
+          />
+          <View style={styles.faceRow}>
+            <View style={styles.avatarWrap}>
+              <Image source={PROFILE_IMAGE} style={styles.avatar} />
+              <View style={styles.avatarGrid} />
+            </View>
+            <View style={styles.faceInfo}>
+              <Text style={[styles.faceName, { color: theme.colors.textPrimary }]}>{user.name}</Text>
+              <Text style={[styles.faceMeta, { color: theme.colors.textSecondary }]}>
+                ZenPae ID - UPI Ready
+              </Text>
+            </View>
+            <LinearGradient
+              colors={['rgba(153,255,50,0.12)', 'rgba(153,255,50,0.02)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.statusBadge}
+            >
+              <Text style={[styles.statusText, { color: theme.colors.accent }]}>Premium</Text>
+            </LinearGradient>
+          </View>
+
+          <View style={styles.faceDetails}>
+            <View style={styles.detailRow}>
+              <Text style={[styles.detailLabel, { color: theme.colors.muted }]}>Phone</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]}>{user.phone}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={[styles.detailLabel, { color: theme.colors.muted }]}>UPI ID</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]}>{user.upi}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={[styles.detailLabel, { color: theme.colors.muted }]}>Linked bank</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]}>ZenPae ****45</Text>
             </View>
           </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.userName}>{user.name || 'Chirantan'}</Text>
-            <Text style={styles.userTag}>Zenpae ID · UPI Ready</Text>
-          </View>
-          <View style={styles.statusChip}>
-            <Text style={styles.statusText}>Premium</Text>
+        </BlurView>
+
+        <View style={styles.snapshotRow}>
+          {[
+            { label: 'Wallet', value: formatCurrency(wallet), highlight: true },
+            { label: 'Saved this month', value: formatCurrency(user.monthlySavings), highlight: false },
+            { label: 'Total spent', value: formatCurrency(analytics.totalSpent), highlight: false },
+          ].map((item) => (
+            <Pressable
+              key={item.label}
+              style={({ pressed }) => [
+                styles.snapshotCard,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.surface,
+                  opacity: pressed ? 0.96 : 1,
+                },
+              ]}
+            >
+              <LinearGradient
+                colors={['rgba(153,255,50,0.08)', 'rgba(153,255,50,0.0)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.snapshotGlow}
+              />
+              <Text style={[styles.snapshotLabel, { color: theme.colors.textSecondary }]}>{item.label}</Text>
+              <Text
+                style={[
+                  styles.snapshotValue,
+                  { color: item.highlight ? theme.colors.accent : theme.colors.textPrimary },
+                ]}
+              >
+                {item.value}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Theme mode</Text>
+          <View style={styles.themeRow}>
+            <TouchableOpacity
+              style={[styles.themePill, { borderColor: theme.colors.border }]}
+              onPress={() => setThemeMode('dark')}
+            >
+              <Text style={[styles.themeText, { color: theme.colors.textPrimary }]}>Dark</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.themePill, { borderColor: theme.colors.border }]}
+              onPress={() => setThemeMode('light')}
+            >
+              <Text style={[styles.themeText, { color: theme.colors.textPrimary }]}>Light</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.themePill, { borderColor: theme.colors.border }]}
+              onPress={() => {
+                setThemeMode('custom');
+                setShowCustomInfo(true);
+              }}
+            >
+              <Text style={[styles.themeText, { color: theme.colors.textPrimary }]}>Custom</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.profileMeta}>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Phone</Text>
-            <Text style={styles.metaValue}>{user.phone || 'N/A'}</Text>
+        <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Your ZenPae Profile</Text>
+        <View style={styles.featureGrid}>
+          {profileCards.map((card) => (
+            <Pressable
+              key={card.title}
+              style={({ pressed }) => [
+                styles.featureCard,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.surface,
+                  opacity: pressed ? 0.96 : 1,
+                },
+              ]}
+            >
+              <Text style={[styles.featureTitle, { color: theme.colors.textPrimary }]}>{card.title}</Text>
+              <Text style={[styles.featureSubtitle, { color: theme.colors.textSecondary }]}>{card.subtitle}</Text>
+              <View style={styles.comingSoonRow}>
+                <View style={styles.comingDot} />
+                <Text style={[styles.featureTag, { color: theme.colors.muted }]}>Coming Soon</Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Settings & controls</Text>
+        <View style={styles.settingsList}>
+          {settings.map((item) => (
+            <Pressable
+              key={item}
+              style={({ pressed }) => [
+                styles.settingRow,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.surface,
+                  opacity: pressed ? 0.96 : 1,
+                },
+              ]}
+            >
+              <Text style={[styles.settingText, { color: theme.colors.textPrimary }]}>{item}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <TouchableOpacity style={styles.logoutButton}>
+          <Text style={[styles.logoutText, { color: theme.colors.muted }]}>Logout</Text>
+        </TouchableOpacity>
+
+        <Modal visible={showCustomInfo} transparent animationType="fade">
+          <Pressable style={styles.modalOverlay} onPress={() => setShowCustomInfo(false)}>
+            <View />
+          </Pressable>
+          <View style={[styles.modalCard, { backgroundColor: theme.colors.surfaceStrong, borderColor: theme.colors.border }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.textPrimary }]}>Custom theme</Text>
+            <Text style={[styles.modalText, { color: theme.colors.textSecondary }]}>
+              In this mode the user can customise the theme and design the app to their comfort.
+            </Text>
+            <Text style={[styles.modalSoon, { color: theme.colors.accent }]}>Coming Soon</Text>
+            <TouchableOpacity style={[styles.modalClose, { backgroundColor: theme.colors.accent }]} onPress={() => setShowCustomInfo(false)}>
+              <Text style={[styles.modalCloseText, { color: theme.colors.black }]}>Got it</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>UPI ID</Text>
-            <Text style={styles.metaValue}>{user.upi || 'not.linked@upi'}</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.walletStrip}>
-        <Text style={styles.walletLabel}>Wallet Balance</Text>
-        <Text style={styles.walletAmount}>
-          {formatCurrency(user.balance || 0)}
-        </Text>
-      </View>
-
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Total Spent</Text>
-          <Text style={styles.statValue}>
-            {formatCurrency(user.totalSpent || 0)}
-          </Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Saved This Month</Text>
-          <Text style={styles.statValue}>
-            {formatCurrency(user.monthlySavings || 0)}
-          </Text>
-        </View>
-      </View>
-
-      <TouchableOpacity style={styles.settingsItem}>
-        <Text style={styles.settingLabel}>Privacy Settings</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.settingsItem}>
-        <Text style={styles.settingLabel}>Payment Methods</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.logoutButton}>
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.resetButton}
-        onPress={() =>
-          Alert.alert(
-            'Reset All Data',
-            'This will clear all saved data on this device.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Reset', style: 'destructive', onPress: resetDemo },
-            ]
-          )
-        }
-      >
-        <Text style={styles.resetText}>Reset Everything</Text>
-      </TouchableOpacity>
+        </Modal>
+      </Animated.View>
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  screenTitle: {
-    ...typography.screenTitle,
-    marginBottom: spacing.lg,
-  } as any,
-  profileHero: {
-    backgroundColor: card.backgroundColor,
-    borderRadius: card.borderRadius,
-    padding: spacing.md,
-    borderWidth: card.borderWidth,
-    borderColor: card.borderColor,
-    shadowColor: card.shadowColor,
-    shadowOpacity: card.shadowOpacity,
-    shadowRadius: card.shadowRadius,
-    shadowOffset: card.shadowOffset,
-    elevation: card.elevation,
-    boxShadow: card.boxShadow,
-    marginBottom: spacing.lg,
-  } as any,
-  profileHeader: {
+  title: {
+    fontSize: 26,
+    fontWeight: '600',
+    marginBottom: 14,
+  },
+  faceCard: {
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 0.5,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  faceGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  faceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  } as any,
-  avatarRing: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  } as any,
-  avatarCircle: {
+    gap: 12,
+  },
+  avatarWrap: {
     width: 56,
     height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceSecondary,
-  } as any,
-  initials: {
-    ...typography.screenTitle,
-    color: colors.textPrimary,
-  } as any,
-  profileInfo: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+  },
+  avatarGrid: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  faceInfo: {
     flex: 1,
-  } as any,
-  userName: {
-    ...typography.sectionTitle,
-  } as any,
-  userTag: {
-    ...typography.small,
-    marginTop: spacing.xs,
-  } as any,
-  statusChip: {
-    backgroundColor: 'rgba(153,255,50,0.12)',
-    borderRadius: 12,
+  },
+  faceName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  faceMeta: {
+    marginTop: 4,
+    fontSize: 12,
+  },
+  statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    marginLeft: spacing.sm,
-  } as any,
+    borderRadius: 10,
+  },
   statusText: {
-    ...typography.small,
-    color: colors.accent,
+    fontSize: 11,
     fontWeight: '600',
-  } as any,
-  profileMeta: {
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    gap: spacing.sm,
-  } as any,
-  metaRow: {
+  },
+  faceDetails: {
+    marginTop: 12,
+    gap: 8,
+  },
+  detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  } as any,
-  metaLabel: {
-    ...typography.label,
-  } as any,
-  metaValue: {
-    ...typography.bodySecondary,
-    color: colors.textPrimary,
-  } as any,
-  walletStrip: {
-    backgroundColor: card.backgroundColor,
-    borderRadius: card.borderRadius,
-    padding: spacing.md,
-    borderWidth: card.borderWidth,
-    borderColor: card.borderColor,
-    shadowColor: card.shadowColor,
-    shadowOpacity: card.shadowOpacity,
-    shadowRadius: card.shadowRadius,
-    shadowOffset: card.shadowOffset,
-    elevation: card.elevation,
-    boxShadow: card.boxShadow,
-    marginBottom: spacing.md,
-  } as any,
-  walletLabel: {
-    ...typography.label,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-  } as any,
-  walletAmount: {
-    ...typography.balance,
-  } as any,
-  statsContainer: {
+  },
+  detailLabel: {
+    fontSize: 12,
+  },
+  detailValue: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  snapshotRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xl,
-  } as any,
-  statCard: {
-    backgroundColor: card.backgroundColor,
-    borderRadius: card.borderRadius,
-    padding: spacing.md,
-    borderWidth: card.borderWidth,
-    borderColor: card.borderColor,
-    shadowColor: card.shadowColor,
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-    boxShadow: card.boxShadow,
-    marginBottom: spacing.md,
-    flex: 0.48,
-  } as any,
-  statLabel: {
-    ...typography.label,
-  } as any,
-  statValue: {
-    ...typography.body,
-    marginTop: spacing.sm,
-  } as any,
-  settingsItem: {
-    backgroundColor: card.backgroundColor,
-    borderRadius: card.borderRadius,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.md,
-    borderWidth: card.borderWidth,
-    borderColor: card.borderColor,
-    shadowColor: card.shadowColor,
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 5,
-    boxShadow: card.boxShadow,
-  } as any,
-  settingLabel: {
-    ...typography.body,
-  } as any,
+    gap: 8,
+    marginBottom: 16,
+  },
+  snapshotCard: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 0.5,
+    overflow: 'hidden',
+  },
+  snapshotGlow: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  snapshotLabel: {
+    fontSize: 11,
+  },
+  snapshotValue: {
+    marginTop: 6,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  section: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  themeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  themePill: {
+    borderRadius: 12,
+    borderWidth: 0.5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  themeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  featureGrid: {
+    gap: 10,
+    marginBottom: 16,
+  },
+  featureCard: {
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 0.5,
+  },
+  featureTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  featureSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+  },
+  featureTag: {
+    marginTop: 8,
+    fontSize: 10,
+  },
+  comingSoonRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  comingDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(153,255,50,0.6)',
+  },
+  settingsList: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  settingRow: {
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 0.5,
+  },
+  settingText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   logoutButton: {
-    marginTop: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: 8,
-  } as any,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
   logoutText: {
-    ...typography.bodySecondary,
-    color: colors.accent,
-    marginBottom: spacing.sm,
-  } as any,
-  resetButton: {
-    marginTop: spacing.md,
-    paddingVertical: spacing.md,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  } as any,
-  resetText: {
-    ...typography.bodySecondary,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  } as any,
-  loadingText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-  } as any,
+    fontSize: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  modalCard: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    top: '35%',
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 0.5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  modalText: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  modalSoon: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  modalClose: {
+    marginTop: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalCloseText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
 
 export default ProfileScreen;

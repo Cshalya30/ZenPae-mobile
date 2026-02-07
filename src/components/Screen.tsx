@@ -1,16 +1,24 @@
 import React from 'react';
 import { ScrollView, View } from 'react-native';
-import { spacing } from '../theme/theme';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AppGradient from './AppGradient';
+import { useTheme } from '../theme/useTheme';
 
 interface ScreenProps {
   children: React.ReactNode;
   scrollable?: boolean;
+  noPadding?: boolean;
 }
 
-export const Screen: React.FC<ScreenProps> = ({ children, scrollable = true }) => {
+export const Screen: React.FC<ScreenProps> = ({
+  children,
+  scrollable = true,
+  noPadding = false,
+}) => {
+  const theme = useTheme();
+  const contentPadding = noPadding ? 0 : theme.spacing.lg;
   const content = (
-    <View style={{ padding: spacing.lg, flex: 1 }}>
+    <View style={{ paddingHorizontal: contentPadding, paddingTop: contentPadding, flex: 1 }}>
       {children}
     </View>
   );
@@ -18,17 +26,23 @@ export const Screen: React.FC<ScreenProps> = ({ children, scrollable = true }) =
   if (scrollable) {
     return (
       <AppGradient>
-        <ScrollView
-          contentContainerStyle={{ paddingBottom: spacing.lg }}
-          showsVerticalScrollIndicator={false}
-        >
-          {content}
-        </ScrollView>
+        <SafeAreaView style={{ flex: 1 }}>
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
+            showsVerticalScrollIndicator={false}
+          >
+            {content}
+          </ScrollView>
+        </SafeAreaView>
       </AppGradient>
     );
   }
 
-  return <AppGradient>{content}</AppGradient>;
+  return (
+    <AppGradient>
+      <SafeAreaView style={{ flex: 1 }}>{content}</SafeAreaView>
+    </AppGradient>
+  );
 };
 
 export default Screen;

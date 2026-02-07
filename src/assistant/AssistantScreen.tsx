@@ -1,209 +1,180 @@
 import React, { useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
-import { colors, spacing, typography, card, input } from '../theme/theme';
+import { View, TouchableOpacity, StyleSheet, TextInput, ScrollView } from 'react-native';
+import Text from '../components/Text';
+import { BlurView } from 'expo-blur';
 import Screen from '../components/Screen';
-import NudgeCard from './NudgeCard';
 import { useFinanceStore } from '../store/financeStore';
 import { askAI } from './aiService';
-import {
-  answerFromData,
-  classifyIntent,
-  generateInsights,
-  summarizeFinanceData,
-} from './assistantLogic';
-import type { AssistantInsight } from './assistantLogic';
-import type { ComponentProps } from 'react';
+import { answerFromData, buildNudgePayload, classifyIntent, generateInsights, summarizeFinanceData, type AssistantInsight } from './assistantLogic';
+import { useTheme } from '../theme/useTheme';
+import NudgeCard from './NudgeCard';
 
-interface Message {
-  id: string;
-  text: string;
-  isUser: boolean;
-  timestamp: Date;
-}
+const ACTION_CHIPS = [
+  'Show me where I overspend',
+  'How can I save more this month?',
+  'Explain my grocery spend',
+  'Optimize my subscriptions',
+];
 
 export const AssistantScreen: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const theme = useTheme();
+  const { transactions, analytics, user } = useFinanceStore();
   const [inputText, setInputText] = useState('');
+  const [activeInsight, setActiveInsight] = useState<AssistantInsight | null>(null);
   const [isSending, setIsSending] = useState(false);
 
-  const { transactions, analytics, user } = useFinanceStore();
-
-  type NudgeType = ComponentProps<typeof NudgeCard>['type'];
-  const nudges = useMemo<AssistantInsight[]>(() => {
+  const insights = useMemo(() => {
     if (transactions.length === 0) {
       return [
         {
-          id: 'first-nudge',
-          type: 'info' as NudgeType,
-          title: 'Start small',
-          message: 'Make your first payment to unlock tailored insights.',
+          id: 'start',
+          condition: 'Neutral',
+          confidence: 0.6,
+          accentColor: '#B6E35C',
+          messageTitle: 'Start with a payment',
+          messageBody: 'Make your first payment to unlock personalized insights.',
+          cta: ['Show me where I overspend', 'Help me save smarter'],
         },
       ];
     }
-
-    const base = generateInsights(transactions);
-    const topCategory = Object.entries(
-      transactions.reduce<Record<string, number>>((acc, t) => {
-        acc[t.category] = (acc[t.category] || 0) + t.amount;
-        return acc;
-      }, {})
-    ).sort((a, b) => b[1] - a[1])[0];
-
-    if (topCategory) {
-      base.push({
-        id: 'top-category',
-        type: 'info' as NudgeType,
-        title: 'Top category',
-        message: `Most spend is on ${topCategory[0]} this period.`,
-      });
-    }
-
-    if (analytics.totalSaved > 0) {
-      base.push({
-        id: 'roundup',
-        type: 'positive' as NudgeType,
-        title: 'Round-ups working',
-        message: `You have saved \u20B9${analytics.totalSaved.toFixed(
-          0
-        )} via round-ups.`,
-      });
-    }
-
+    const base = generateInsights(transactions, analytics, user);
     return base.slice(0, 3);
-  }, [transactions, analytics.totalSaved]);
+  }, [transactions, analytics, user]);
 
-  const handleSendMessage = async () => {
-    const trimmed = inputText.trim();
-    if (!trimmed || isSending) return;
-
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: trimmed,
-      isUser: true,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
-    setInputText('');
+  const handleAction = async (prompt: string) => {
+    if (isSending) return;
     setIsSending(true);
 
-    const intent = classifyIntent(trimmed);
+    const intent = classifyIntent(prompt);
     const dataAnswer = answerFromData(intent, transactions);
-
-    let reply = dataAnswer;
-    if (!reply) {
-      const context = [
-        `User: ${user?.name ?? 'Unknown'}`,
-        `Wallet balance: \u20B9${user?.balance ?? 0}`,
-        `Total spent: \u20B9${analytics.totalSpent}`,
-        `Total saved: \u20B9${analytics.totalSaved}`,
-        `Monthly savings: \u20B9${user?.monthlySavings ?? 0}`,
-        summarizeFinanceData(transactions),
-      ].join('\n');
-
-      reply = await askAI({ context, question: trimmed });
+    if (dataAnswer) {
+      const localNudge = buildNudgePayload({
+        transactions,
+        analytics,
+        user,
+        messageOverride: dataAnswer,
+      });
+      setActiveInsight({ ...localNudge, id: 'deep-dive' });
+      setIsSending(false);
+      return;
     }
 
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      text: reply ?? 'Tell me more about your goal and I will tailor a plan.',
-      isUser: false,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, assistantMessage]);
+    const context = [
+      `User: ${user?.name ?? 'Unknown'}`,
+      `Wallet balance: ${user?.balance ?? 0}`,
+      `Total spent: ${analytics.totalSpent}`,
+      `Total saved: ${analytics.totalSaved}`,
+      `Monthly savings: ${user?.monthlySavings ?? 0}`,
+      summarizeFinanceData(transactions),
+    ].join('\n');
+    const reply = await askAI({ context, question: prompt });
+    setActiveInsight({ ...reply, id: 'deep-dive' });
     setIsSending(false);
   };
 
   return (
     <Screen>
-      <Text style={styles.screenTitle}>Finance Assistant</Text>
-
-      <View style={styles.headerCard}>
-        <View>
-          <Text style={styles.headerTitle}>Hey {user?.name ?? 'there'}</Text>
-          <Text style={styles.headerSubtitle}>
-            Ask for category tips, savings nudges, or spending summaries.
-          </Text>
-        </View>
-        <View style={styles.headerChip}>
-          <Text style={styles.headerChipText}>AI Mode</Text>
-        </View>
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>
+          Hey {user?.name ?? 'Chirantan'}
+        </Text>
+        <Text style={[styles.headerSub, { color: theme.colors.textSecondary }]}>
+          Here's what I noticed about your money
+        </Text>
+        <Text style={[styles.headerMeta, { color: theme.colors.muted }]}>
+          Smart insights - Private - Secure
+        </Text>
       </View>
 
-      <View style={styles.nudgesSection}>
-        <Text style={styles.sectionLabel}>Insights for You</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {nudges.map((nudge) => (
+      <View style={styles.insightGrid}>
+        {insights.map((insight) => (
+          <TouchableOpacity
+            key={insight.id}
+            activeOpacity={0.8}
+            onPress={() => setActiveInsight(insight)}
+          >
             <NudgeCard
-              key={nudge.id}
-              type={nudge.type}
-              title={nudge.title}
-              message={nudge.message}
+              accentColor={insight.accentColor}
+              title={insight.messageTitle}
+              message={insight.messageBody}
             />
-          ))}
-        </ScrollView>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      <View style={styles.chatContainer}>
-        <Text style={styles.sectionLabel}>Chat</Text>
-        {messages.length === 0 ? (
-          <View style={styles.emptyChat}>
-            <Text style={styles.emptyChatText}>
-              Start a conversation about your finances!
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={messages}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            renderItem={({ item }) => (
-              <View
+      <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Quick actions</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+        {ACTION_CHIPS.map((chip) => (
+          <TouchableOpacity
+            key={chip}
+            style={[styles.chip, { borderColor: theme.colors.border }]}
+            onPress={() => handleAction(chip)}
+          >
+            <Text style={[styles.chipText, { color: theme.colors.textPrimary }]}>{chip}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {activeInsight ? (
+        <BlurView
+          intensity={20}
+          tint={theme.mode === 'dark' ? 'dark' : 'light'}
+          style={[
+            styles.deepDive,
+            {
+              borderColor: theme.colors.border,
+              shadowColor: activeInsight.accentColor,
+            },
+          ]}
+        >
+          <Text style={[styles.deepTitle, { color: theme.colors.textPrimary }]}>
+            {activeInsight.messageTitle}
+          </Text>
+          <Text style={[styles.deepBody, { color: theme.colors.textSecondary }]}>
+            {activeInsight.messageBody}
+          </Text>
+          <View style={styles.ctaRow}>
+            {activeInsight.cta.slice(0, 2).map((item) => (
+              <TouchableOpacity
+                key={item}
                 style={[
-                  styles.messageBubble,
-                  item.isUser ? styles.userBubble : styles.assistantBubble,
+                  styles.ctaChip,
+                  {
+                    borderColor: activeInsight.accentColor,
+                  },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.messageText,
-                    item.isUser ? styles.userText : styles.assistantText,
-                  ]}
-                >
-                  {item.text}
-                </Text>
-              </View>
-            )}
-          />
-        )}
-      </View>
+                <Text style={[styles.ctaText, { color: activeInsight.accentColor }]}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </BlurView>
+      ) : null}
 
-      <View style={styles.inputContainer}>
+      <View style={[styles.commandBar, { borderColor: theme.colors.border, backgroundColor: theme.input.background }]}>
         <TextInput
-          style={styles.input}
-          placeholder="Ask me anything..."
-          placeholderTextColor={colors.textSecondary}
           value={inputText}
           onChangeText={setInputText}
-          multiline
+          placeholder="Ask about your spending, savings, or goals..."
+          placeholderTextColor={theme.colors.muted}
+          style={[styles.commandInput, { color: theme.colors.textPrimary }]}
+          onSubmitEditing={() => {
+            if (inputText.trim()) {
+              handleAction(inputText.trim());
+              setInputText('');
+            }
+          }}
         />
         <TouchableOpacity
-          style={[styles.sendButton, isSending && styles.sendButtonDisabled]}
-          onPress={handleSendMessage}
-          activeOpacity={0.8}
+          onPress={() => {
+            if (inputText.trim()) {
+              handleAction(inputText.trim());
+              setInputText('');
+            }
+          }}
+          disabled={isSending}
         >
-          <Text style={styles.sendButtonText}>
-            {isSending ? '...' : '\u2192'}
-          </Text>
+          <Text style={[styles.sendText, { color: theme.colors.accent }]}>{isSending ? '...' : 'Send'}</Text>
         </TouchableOpacity>
       </View>
     </Screen>
@@ -211,124 +182,110 @@ export const AssistantScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  screenTitle: {
-    ...typography.screenTitle,
-    marginBottom: spacing.lg,
-  } as any,
-  nudgesSection: {
-    marginBottom: spacing.lg,
-  } as any,
-  sectionLabel: {
-    ...typography.label,
-    marginBottom: spacing.md,
-  } as any,
-  headerCard: {
-    backgroundColor: card.backgroundColor,
-    borderRadius: card.borderRadius,
-    padding: spacing.md,
-    borderWidth: card.borderWidth,
-    borderColor: card.borderColor,
-    shadowColor: card.shadowColor,
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
-    boxShadow: card.boxShadow,
-    marginBottom: spacing.lg,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  } as any,
+  header: {
+    marginBottom: 16,
+  },
   headerTitle: {
-    ...typography.sectionTitle,
-  } as any,
-  headerSubtitle: {
-    ...typography.bodySecondary,
-    marginTop: spacing.xs,
-  } as any,
-  headerChip: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: 'rgba(153,255,50,0.12)',
-  } as any,
-  headerChipText: {
-    ...typography.small,
-    color: colors.accent,
+    fontSize: 24,
     fontWeight: '600',
-  } as any,
-  chatContainer: {
-    flex: 1,
-    marginBottom: spacing.lg,
-  } as any,
-  emptyChat: {
-    backgroundColor: colors.surfaceSecondary,
-    padding: spacing.md,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  } as any,
-  emptyChatText: {
-    ...typography.bodySecondary,
-  } as any,
-  messageBubble: {
-    marginVertical: spacing.sm,
-    marginHorizontal: spacing.md,
-  } as any,
-  userBubble: {
-    backgroundColor: colors.accent,
-    alignSelf: 'flex-end',
-    borderRadius: 12,
-    padding: spacing.md,
-    maxWidth: '80%',
-  } as any,
-  assistantBubble: {
-    backgroundColor: colors.surface,
-    alignSelf: 'flex-start',
-    borderRadius: 12,
-    padding: spacing.md,
-    maxWidth: '80%',
-    borderWidth: 1,
-    borderColor: colors.border,
-  } as any,
-  messageText: {
-    ...typography.body,
-  } as any,
-  userText: {
-    color: colors.black,
-  } as any,
-  assistantText: {
-    color: colors.textPrimary,
-  } as any,
-  inputContainer: {
+  },
+  headerSub: {
+    marginTop: 4,
+    fontSize: 13,
+  },
+  headerMeta: {
+    marginTop: 6,
+    fontSize: 11,
+  },
+  insightGrid: {
+    gap: 10,
+    marginBottom: 16,
+  },
+  insightCard: {
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 0.5,
+  },
+  insightTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  insightBody: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  chipRow: {
+    marginBottom: 16,
+  },
+  chip: {
+    borderRadius: 18,
+    borderWidth: 0.5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  deepDive: {
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 0.5,
+    marginBottom: 16,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
+  },
+  deepTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  deepBody: {
+    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  ctaRow: {
     flexDirection: 'row',
-    backgroundColor: input.background,
-    borderRadius: input.borderRadius,
-    padding: spacing.sm,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  ctaChip: {
+    borderRadius: 16,
+    borderWidth: 0.5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  ctaText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  commandBar: {
+    borderRadius: 14,
+    borderWidth: 0.5,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: input.borderColor,
-  } as any,
-  input: {
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  commandInput: {
     flex: 1,
-    color: colors.textPrimary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    maxHeight: 100,
-  } as any,
-  sendButton: {
-    paddingHorizontal: spacing.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  } as any,
-  sendButtonDisabled: {
-    opacity: 0.6,
-  } as any,
-  sendButtonText: {
-    color: colors.accent,
-    fontSize: 18,
-  } as any,
+    fontSize: 13,
+  },
+  sendText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });
 
 export default AssistantScreen;

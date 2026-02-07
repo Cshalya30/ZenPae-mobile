@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated } from 'react-native';
+import Text from '../Text';
 import { useEffect, useRef } from 'react';
 import { colors, spacing, typography } from '../../theme/theme';
 import { formatCurrency } from '../../utils/format';
@@ -111,7 +112,7 @@ const styles = StyleSheet.create({
   },
   vendor: {
     ...typography.body,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   meta: {
     ...typography.small,
@@ -119,6 +120,6 @@ const styles = StyleSheet.create({
   },
   amount: {
     ...typography.sectionTitle,
-    fontWeight: '700',
+    fontWeight: '600',
   },
 });

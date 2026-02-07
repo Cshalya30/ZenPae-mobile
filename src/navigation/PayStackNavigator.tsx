@@ -11,7 +11,7 @@ export type PayStackParamList = {
     vendor: string;
     category: Category;
     isRecurring: boolean;
-    frequency?: 'Weekly' | 'Monthly' | 'Yearly';
+    frequency?: 'Daily' | 'Weekly' | 'Monthly' | 'Custom';
   };
 };
 

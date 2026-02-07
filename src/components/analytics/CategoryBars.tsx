@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated } from 'react-native';
+import Text from '../Text';
 import { useEffect, useRef } from 'react';
 import { colors, spacing, typography } from '../../theme/theme';
 import { formatCurrency } from '../../utils/format';

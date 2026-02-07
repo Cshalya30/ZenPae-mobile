@@ -1,17 +1,13 @@
-import React, { useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Animated,
-  StyleSheet,
-} from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+import Text from '../components/Text';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, spacing, typography, button } from '../theme/theme';
+import Svg, { Path, Circle } from 'react-native-svg';
 import Screen from '../components/Screen';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PayStackParamList } from '../navigation/PayStackNavigator';
 import { formatCurrency } from '../utils/format';
+import { useTheme } from '../theme/useTheme';
 
 type PostPaymentScreenProps = NativeStackScreenProps<
   PayStackParamList,
@@ -19,33 +15,31 @@ type PostPaymentScreenProps = NativeStackScreenProps<
 >;
 
 export const PostPaymentScreen: React.FC<PostPaymentScreenProps> = ({
-  navigation,
   route,
+  navigation,
 }) => {
+  const theme = useTheme();
   const { amount, vendor, isRecurring, frequency } = route.params;
-  const scaleAnim = new Animated.Value(0);
-  const opacityAnim = new Animated.Value(0);
+  const draw = useRef(new Animated.Value(0)).current;
+  const ringOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 5,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacityAnim, {
+      Animated.timing(draw, {
         toValue: 1,
         duration: 600,
-        useNativeDriver: true,
+        useNativeDriver: false,
+      }),
+      Animated.timing(ringOpacity, {
+        toValue: 0.28,
+        duration: 200,
+        delay: 400,
+        useNativeDriver: false,
       }),
     ]).start();
+  }, [draw, ringOpacity]);
 
-    const timer = setTimeout(() => {
-      navigation.goBack();
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [navigation, scaleAnim, opacityAnim]);
+  const AnimatedPath = Animated.createAnimatedComponent(Path);
 
   return (
     <Screen scrollable={false}>
@@ -55,54 +49,49 @@ export const PostPaymentScreen: React.FC<PostPaymentScreenProps> = ({
             style={[
               styles.rippleRing,
               {
-                transform: [{ scale: scaleAnim }],
+                borderColor: theme.colors.accent,
+                opacity: ringOpacity,
               },
             ]}
           />
-          <Animated.View
-            style={[
-              styles.tickContainer,
-              {
-                opacity: opacityAnim,
-                transform: [{ scale: scaleAnim }],
-              },
-            ]}
-          >
-            <Text style={styles.tick}>✓</Text>
-          </Animated.View>
+          <View style={[styles.tickContainer, { backgroundColor: theme.colors.accent }]}>
+            <Svg width={64} height={64} viewBox="0 0 64 64">
+              <Circle cx="32" cy="32" r="26" stroke="rgba(255,255,255,0.08)" strokeWidth="2" fill="none" />
+              <AnimatedPath
+                d="M18 34 L28 44 L46 22"
+                stroke={theme.colors.black}
+                strokeWidth={4}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+                strokeDasharray={60}
+                strokeDashoffset={draw.interpolate({ inputRange: [0, 1], outputRange: [60, 0] })}
+              />
+            </Svg>
+          </View>
         </View>
 
-        <Animated.View
-          style={[
-            styles.textContainer,
-            {
-              opacity: opacityAnim,
-            },
-          ]}
-        >
-          <Text style={styles.successTitle}>Payment Successful</Text>
-          <Text style={styles.successMessage}>
+        <View style={styles.textContainer}>
+          <Text style={[styles.successTitle, { color: theme.colors.textPrimary }]}>Payment Successful</Text>
+          <Text style={[styles.successMessage, { color: theme.colors.textSecondary }]}>
             Payment sent to {vendor}
           </Text>
           {isRecurring ? (
-            <Text style={styles.successSubtext}>
+            <Text style={[styles.successSubtext, { color: theme.colors.textSecondary }]}>
               Recurs {frequency ?? 'Monthly'}
             </Text>
           ) : null}
-          <Text style={styles.successAmount}>{formatCurrency(amount)}</Text>
-        </Animated.View>
+          <Text style={[styles.successAmount, { color: theme.colors.accent }]}>{formatCurrency(amount)}</Text>
+        </View>
 
-        <TouchableOpacity
-          style={styles.continueButton}
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity style={styles.continueButton} onPress={() => navigation.goBack()}>
           <LinearGradient
-            colors={button.gradient}
+            colors={theme.button.gradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.continueGradient}
           >
-            <Text style={styles.continueText}>Continue</Text>
+            <Text style={[styles.continueText, { color: theme.colors.black }]}>Continue</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -115,79 +104,64 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  } as any,
+  },
   animationContainer: {
     position: 'relative',
     width: 120,
     height: 120,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
-  } as any,
+    marginBottom: 18,
+  },
   rippleRing: {
     position: 'absolute',
     width: 120,
     height: 120,
     borderRadius: 60,
     borderWidth: 3,
-    borderColor: colors.accent,
-  } as any,
+  },
   tickContainer: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-  } as any,
-  tick: {
-    fontSize: 50,
-    color: colors.black,
-    fontWeight: 'bold',
-  } as any,
+  },
   textContainer: {
     alignItems: 'center',
-    marginBottom: spacing.xl,
-  } as any,
+    marginBottom: 24,
+  },
   successTitle: {
-    ...typography.sectionTitle,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-  } as any,
+    fontSize: 20,
+    fontWeight: '600',
+  },
   successMessage: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginTop: spacing.sm,
-  } as any,
+    fontSize: 13,
+    marginTop: 8,
+  },
   successSubtext: {
-    ...typography.bodySecondary,
-    marginTop: spacing.xs,
-  } as any,
+    fontSize: 12,
+    marginTop: 4,
+  },
   successAmount: {
-    ...typography.balance,
-    marginTop: spacing.sm,
-  } as any,
+    fontSize: 24,
+    fontWeight: '600',
+    marginTop: 8,
+  },
   continueButton: {
-    paddingVertical: spacing.md,
-    borderRadius: button.borderRadius,
-    marginTop: spacing.md,
-    shadowColor: button.shadowColor,
-    shadowOpacity: button.shadowOpacity,
-    shadowRadius: button.shadowRadius,
-    shadowOffset: button.shadowOffset,
-    elevation: button.elevation,
-    boxShadow: button.boxShadow,
-  } as any,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
   continueGradient: {
-    paddingVertical: spacing.md,
-    borderRadius: button.borderRadius,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 16,
     alignItems: 'center',
-    justifyContent: 'center',
-  } as any,
+  },
   continueText: {
-    ...typography.button,
-    color: colors.black,
-  } as any,
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
 
 export default PostPaymentScreen;

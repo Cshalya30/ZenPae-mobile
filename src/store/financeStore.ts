@@ -27,7 +27,7 @@ export type Transaction = {
   category: Category;
   note?: string;
   isRecurring: boolean;
-  frequency?: 'Weekly' | 'Monthly' | 'Yearly';
+  frequency?: 'Daily' | 'Weekly' | 'Monthly' | 'Custom';
   timestamp: number;
 };
 
@@ -51,6 +51,8 @@ export type DreamGoal = {
   saved: number;
   milestones: Milestone[];
   templateId?: string;
+  emoji?: string;
+  allocationPct?: number;
 };
 
 export type UserProfile = {
@@ -87,6 +89,10 @@ export type FinanceState = {
   lastVendor?: string;
   aiInsight: string;
 
+  /* Theme */
+  themeMode: 'dark' | 'light' | 'custom';
+  setThemeMode: (mode: 'dark' | 'light' | 'custom') => void;
+
   /* Actions */
   makePayment: (
     amount: number,
@@ -94,10 +100,11 @@ export type FinanceState = {
     vendor: string,
     isRecurring: boolean,
     note?: string,
-    frequency?: 'Weekly' | 'Monthly' | 'Yearly'
+    frequency?: 'Daily' | 'Weekly' | 'Monthly' | 'Custom'
   ) => boolean;
 
   addDream: (dream: DreamGoal) => void;
+  saveDream: (dream: DreamGoal) => void;
   setActiveDream: (dreamId: string) => void;
   resetDemo: () => void;
 };
@@ -175,6 +182,12 @@ export const useFinanceStore = create<FinanceState>()(
   lastRoundUp: 0,
   aiInsight: '',
 
+  themeMode: 'dark',
+  setThemeMode: (mode) =>
+    set(() => ({
+      themeMode: mode,
+    })),
+
   /* -----------------------------
      MAKE PAYMENT (STABLE)
   ----------------------------- */
@@ -184,7 +197,7 @@ export const useFinanceStore = create<FinanceState>()(
     vendor: string,
     isRecurring: boolean,
     note?: string,
-    frequency?: 'Weekly' | 'Monthly' | 'Yearly'
+    frequency?: 'Daily' | 'Weekly' | 'Monthly' | 'Custom'
   ) => {
     const state = get();
     const roundUp = calculateRoundUp(amount);
@@ -253,6 +266,17 @@ export const useFinanceStore = create<FinanceState>()(
       activeDreamId: dream.id,
     })),
 
+  saveDream: (dream: DreamGoal) =>
+    set((state) => {
+      const index = state.dreams.findIndex((d) => d.id === dream.id);
+      if (index >= 0) {
+        const updated = [...state.dreams];
+        updated[index] = dream;
+        return { dreams: updated, activeDreamId: dream.id };
+      }
+      return { dreams: [dream, ...state.dreams], activeDreamId: dream.id };
+    }),
+
   setActiveDream: (dreamId: string) =>
     set(() => ({
       activeDreamId: dreamId,
@@ -289,6 +313,7 @@ export const useFinanceStore = create<FinanceState>()(
         totalSpent: 0,
         monthlySavings: 0,
       },
+      themeMode: 'dark',
     }),
     }),
     {
@@ -305,7 +330,8 @@ function applyDreamSavings(state: FinanceState, roundUp: number): DreamGoal[] {
 
   return state.dreams.map((dream) => {
     if (dream.id !== targetId) return dream;
-    const newSaved = dream.saved + roundUp;
+    const allocation = dream.allocationPct ? roundUp * (dream.allocationPct / 100) : roundUp * 0.07;
+    const newSaved = dream.saved + allocation;
     const progress = newSaved / Math.max(dream.targetAmount, 1);
     const updatedMilestones = dream.milestones.map((m, idx) => {
       const threshold = idx === 0 ? 0.25 : idx === 1 ? 0.6 : 1;

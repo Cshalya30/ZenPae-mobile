@@ -5,9 +5,9 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import Text from './Text';
 import { useTheme } from '../theme/useTheme';
 
 const ZENPAE_LOGO = require('../../assets/icon.png');

@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import {
   View,
-  Text,
   TextInput,
   StyleSheet,
   Modal,
   TouchableOpacity,
 } from 'react-native';
-import { colors, spacing, typography, button, card, input } from '../theme/theme';
+import Text from './Text';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../theme/useTheme';
 
 type PinModalProps = {
   visible: boolean;
@@ -21,6 +21,7 @@ export default function PinModal({
   onSuccess,
   onClose,
 }: PinModalProps) {
+  const theme = useTheme();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
 
@@ -43,7 +44,7 @@ export default function PinModal({
     >
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <Text style={styles.title}>Enter PIN</Text>
+          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Enter PIN</Text>
 
           <TextInput
             value={pin}
@@ -51,25 +52,32 @@ export default function PinModal({
             keyboardType="number-pad"
             secureTextEntry
             maxLength={4}
-            style={styles.input}
-            placeholderTextColor={colors.textSecondary}
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.input.background,
+                borderColor: theme.input.borderColor,
+                color: theme.colors.textPrimary,
+              },
+            ]}
+            placeholderTextColor={theme.colors.textSecondary}
           />
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <Text style={[styles.error, { color: theme.colors.warning }]}>{error}</Text> : null}
 
           <TouchableOpacity style={styles.btn} onPress={verifyPin} activeOpacity={0.92}>
             <LinearGradient
-              colors={button.gradient}
+              colors={theme.button.gradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.btnGradient}
             >
-              <Text style={styles.btnText}>Confirm</Text>
+              <Text style={[styles.btnText, { color: theme.colors.black }]}>Confirm</Text>
             </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={onClose} activeOpacity={0.8}>
-            <Text style={styles.cancel}>Cancel</Text>
+            <Text style={[styles.cancel, { color: theme.colors.textSecondary }]}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -86,68 +94,52 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '80%',
-    backgroundColor: card.backgroundColor,
-    borderRadius: card.borderRadius,
-    padding: spacing.lg,
-    borderWidth: card.borderWidth,
-    borderColor: card.borderColor,
-    shadowColor: card.shadowColor,
-    shadowOpacity: card.shadowOpacity,
-    shadowRadius: card.shadowRadius,
-    shadowOffset: card.shadowOffset,
-    elevation: card.elevation,
-    boxShadow: card.boxShadow,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 0.5,
   },
   title: {
-    ...typography.sectionTitle,
     textAlign: 'center',
-    marginBottom: spacing.md,
+    marginBottom: 12,
   },
   input: {
-    backgroundColor: input.background,
-    borderRadius: input.borderRadius,
-    paddingVertical: input.paddingVertical,
-    paddingHorizontal: input.paddingHorizontal,
-    borderWidth: 1,
-    borderColor: input.borderColor,
-    color: colors.textPrimary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderWidth: 0.5,
     fontSize: 18,
     textAlign: 'center',
     letterSpacing: 6,
   },
   error: {
-    ...typography.small,
-    color: '#EF4444',
     textAlign: 'center',
     marginTop: 10,
   },
   btn: {
-    paddingVertical: spacing.md,
-    borderRadius: button.borderRadius,
-    marginTop: spacing.md,
+    paddingVertical: 12,
+    borderRadius: 16,
+    marginTop: 12,
     height: 48,
     justifyContent: 'center',
-    shadowColor: button.shadowColor,
-    shadowOpacity: button.shadowOpacity,
-    shadowRadius: button.shadowRadius,
-    shadowOffset: button.shadowOffset,
-    elevation: button.elevation,
-    boxShadow: button.boxShadow,
+    shadowColor: '#000000',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
   btnGradient: {
     height: '100%',
-    borderRadius: button.borderRadius,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnText: {
-    ...typography.button,
-    color: button.color,
     textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '600',
   },
   cancel: {
-    ...typography.bodySecondary,
     textAlign: 'center',
-    marginTop: spacing.md,
+    marginTop: 12,
   },
 });
