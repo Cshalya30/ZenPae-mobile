@@ -323,6 +323,8 @@ export const useFinanceStore = create<FinanceState>()(
   )
 );
 
+const roundCurrency = (n: number) => Math.round(n * 100) / 100;
+
 function applyDreamSavings(state: FinanceState, roundUp: number): DreamGoal[] {
   if (state.dreams.length === 0 || roundUp <= 0) return state.dreams;
 
@@ -330,8 +332,12 @@ function applyDreamSavings(state: FinanceState, roundUp: number): DreamGoal[] {
 
   return state.dreams.map((dream) => {
     if (dream.id !== targetId) return dream;
-    const allocation = dream.allocationPct ? roundUp * (dream.allocationPct / 100) : roundUp * 0.07;
-    const newSaved = dream.saved + allocation;
+    const pct = dream.allocationPct != null ? dream.allocationPct / 100 : 0.07;
+    const allocation = roundCurrency(roundUp * pct);
+    const newSaved = Math.min(
+      roundCurrency(dream.saved + allocation),
+      dream.targetAmount
+    );
     const progress = newSaved / Math.max(dream.targetAmount, 1);
     const updatedMilestones = dream.milestones.map((m, idx) => {
       const threshold = idx === 0 ? 0.25 : idx === 1 ? 0.6 : 1;

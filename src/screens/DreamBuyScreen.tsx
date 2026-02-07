@@ -47,8 +47,8 @@ export const DreamBuyScreen: React.FC = () => {
 
   const progressAnim = useRef(new Animated.Value(0)).current;
 
-  const savedValue = activeDream?.saved ?? 0;
   const goalValue = parseAmount(targetAmount || '0');
+  const savedValue = Math.round((activeDream?.saved ?? 0) * 100) / 100;
   const progress = goalValue > 0 ? Math.min(savedValue / goalValue, 1) : 0;
 
   useEffect(() => {
@@ -217,12 +217,12 @@ export const DreamBuyScreen: React.FC = () => {
                 {Math.round(progress * 100)}%
               </Text>
             </View>
-            <View style={[styles.progressTrack, { backgroundColor: 'rgba(153,255,50,0.12)' }]}>
+            <View style={[styles.progressTrack, { backgroundColor: 'rgba(153,255,50,0.10)' }]}>
               <Animated.View
                 style={[
                   styles.progressFill,
                   {
-                    backgroundColor: 'rgba(153,255,50,0.6)',
+                    backgroundColor: 'rgba(153,255,50,0.45)',
                     width: progressAnim.interpolate({
                       inputRange: [0, 1],
                       outputRange: ['0%', '100%'],
@@ -415,14 +415,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   progressTrack: {
-    height: 12,
-    borderRadius: 6,
+    height: 14,
+    borderRadius: 7,
     overflow: 'hidden',
     marginTop: 8,
   },
   progressFill: {
     height: '100%',
-    borderRadius: 6,
+    borderRadius: 7,
   },
   progressHint: {
     marginTop: 6,
