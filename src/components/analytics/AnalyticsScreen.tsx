@@ -44,6 +44,7 @@ export default function AnalyticsScreen() {
   const [showExport, setShowExport] = useState(false);
   const chartScale = useRef(new Animated.Value(1)).current;
   const chartGlow = useRef(new Animated.Value(0)).current;
+  const chartBrightness = useRef(new Animated.Value(0)).current;
 
   const categoryTotals = useMemo<Record<Category, number>>(() => {
     const base: Record<Category, number> = {
@@ -135,10 +136,16 @@ export default function AnalyticsScreen() {
               useNativeDriver: true,
             }),
             Animated.timing(chartGlow, {
-              toValue: 0.06,
+              toValue: 1,
               duration: 140,
               easing: Easing.bezier(0.22, 1, 0.36, 1),
               useNativeDriver: false,
+            }),
+            Animated.timing(chartBrightness, {
+              toValue: 1,
+              duration: 140,
+              easing: Easing.bezier(0.22, 1, 0.36, 1),
+              useNativeDriver: true,
             }),
           ]).start();
         }}
@@ -156,12 +163,24 @@ export default function AnalyticsScreen() {
               easing: Easing.bezier(0.22, 1, 0.36, 1),
               useNativeDriver: false,
             }),
+            Animated.timing(chartBrightness, {
+              toValue: 0,
+              duration: 160,
+              easing: Easing.bezier(0.22, 1, 0.36, 1),
+              useNativeDriver: true,
+            }),
           ]).start();
         }}
       >
         <Animated.View style={[styles.chartCard, { transform: [{ scale: chartScale }] }]}>
           <View style={styles.chartOverlay} />
           <Animated.View style={[styles.chartGlow, { opacity: chartGlow }]} />
+          <Animated.View
+            style={[
+              styles.chartBrightness,
+              { opacity: chartBrightness.interpolate({ inputRange: [0, 1], outputRange: [0, 0.06] }) },
+            ]}
+          />
           {segment === 'Spending Split' ? (
             <PieChart data={categoryTotals} />
           ) : null}
@@ -258,7 +277,6 @@ const PieChart = ({ data }: { data: Record<string, number> }) => {
 
   const containerOpacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(6)).current;
-  const outerOpacity = useRef(new Animated.Value(0)).current;
   const strokeProgress = useRef(arcs.map(() => new Animated.Value(0))).current;
 
   useEffect(() => {
@@ -275,13 +293,6 @@ const PieChart = ({ data }: { data: Record<string, number> }) => {
         easing: Easing.bezier(0.22, 1, 0.36, 1),
         useNativeDriver: true,
       }),
-      Animated.timing(outerOpacity, {
-        toValue: 0.28,
-        duration: 200,
-        delay: 600,
-        easing: Easing.bezier(0.22, 1, 0.36, 1),
-        useNativeDriver: false,
-      }),
     ]).start();
 
     Animated.parallel(
@@ -289,15 +300,15 @@ const PieChart = ({ data }: { data: Record<string, number> }) => {
         Animated.timing(p, {
           toValue: 1,
           duration: 600,
+          delay: 200,
           easing: Easing.bezier(0.22, 1, 0.36, 1),
           useNativeDriver: false,
         })
       )
     ).start();
-  }, [containerOpacity, translateY, outerOpacity, strokeProgress]);
+  }, [containerOpacity, translateY, strokeProgress]);
 
   const AnimatedPath = Animated.createAnimatedComponent(Path);
-  const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
   return (
     <Animated.View style={[styles.chartWrap, { opacity: containerOpacity, transform: [{ translateY }] }]}>
@@ -323,14 +334,13 @@ const PieChart = ({ data }: { data: Record<string, number> }) => {
             );
           })}
           <Circle cx={0} cy={0} r={radius - thickness + 1} fill={ZP.INNER} />
-          <AnimatedCircle
+          <Circle
             cx={0}
             cy={0}
             r={radius + 1}
             stroke={ZP.OUTER_STROKE}
             strokeWidth={1.5}
             fill="none"
-            opacity={outerOpacity}
           />
           <Circle
             cx={0}
@@ -493,6 +503,10 @@ const styles = StyleSheet.create({
   chartGlow: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(153,255,50,0.06)',
+  },
+  chartBrightness: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FFFFFF',
   },
   chartWrap: {
     alignItems: 'center',
