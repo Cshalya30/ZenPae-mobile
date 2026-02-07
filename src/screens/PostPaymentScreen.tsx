@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Animated, TouchableOpacity, Easing } from 'react-native';
 import Text from '../components/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -8,6 +8,9 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PayStackParamList } from '../navigation/PayStackNavigator';
 import { formatCurrency } from '../utils/format';
 import { useTheme } from '../theme/useTheme';
+
+const TICK_PATH_LENGTH = 52;
+const SUCCESS_EASING = Easing.bezier(0.22, 1, 0.36, 1);
 
 type PostPaymentScreenProps = NativeStackScreenProps<
   PayStackParamList,
@@ -28,12 +31,14 @@ export const PostPaymentScreen: React.FC<PostPaymentScreenProps> = ({
       Animated.timing(draw, {
         toValue: 1,
         duration: 600,
+        easing: SUCCESS_EASING,
         useNativeDriver: false,
       }),
       Animated.timing(ringOpacity, {
         toValue: 0.28,
-        duration: 200,
-        delay: 400,
+        duration: 280,
+        delay: 320,
+        easing: SUCCESS_EASING,
         useNativeDriver: false,
       }),
     ]).start();
@@ -64,8 +69,8 @@ export const PostPaymentScreen: React.FC<PostPaymentScreenProps> = ({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 fill="none"
-                strokeDasharray={60}
-                strokeDashoffset={draw.interpolate({ inputRange: [0, 1], outputRange: [60, 0] })}
+                strokeDasharray={TICK_PATH_LENGTH}
+                strokeDashoffset={draw.interpolate({ inputRange: [0, 1], outputRange: [TICK_PATH_LENGTH, 0] })}
               />
             </Svg>
           </View>

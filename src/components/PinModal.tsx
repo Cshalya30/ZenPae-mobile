@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -9,6 +9,8 @@ import {
 import Text from './Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/useTheme';
+
+const DEMO_PIN = '1234';
 
 type PinModalProps = {
   visible: boolean;
@@ -25,14 +27,26 @@ export default function PinModal({
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (!visible) {
+      setPin('');
+      setError('');
+    }
+  }, [visible]);
+
   const verifyPin = () => {
-    if (pin === '1234') {
+    if (pin === DEMO_PIN) {
       setPin('');
       setError('');
       onSuccess();
     } else {
       setError('Incorrect PIN');
     }
+  };
+
+  const handleChangePin = (text: string) => {
+    setPin(text);
+    if (error) setError('');
   };
 
   return (
@@ -48,7 +62,7 @@ export default function PinModal({
 
           <TextInput
             value={pin}
-            onChangeText={setPin}
+            onChangeText={handleChangePin}
             keyboardType="number-pad"
             secureTextEntry
             maxLength={4}

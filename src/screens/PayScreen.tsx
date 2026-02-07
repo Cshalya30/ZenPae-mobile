@@ -139,9 +139,9 @@ export const PayScreen: React.FC = () => {
                     borderColor: active ? theme.colors.accent : theme.colors.border,
                     backgroundColor: theme.colors.surfaceSecondary,
                     shadowColor: active ? theme.colors.accent : 'transparent',
-                    shadowOpacity: active ? 0.12 : 0,
-                    shadowRadius: active ? 10 : 0,
-                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: active ? 0.18 : 0,
+                    shadowRadius: active ? 12 : 0,
+                    shadowOffset: { width: 0, height: 0 },
                     elevation: active ? 4 : 0,
                   },
                 ]}
